@@ -1,0 +1,56 @@
+name: Auto Promotion Branches
+
+on:
+  push:
+    branches:
+      - dev
+    paths-ignore:
+      - .github/workflows/autopromotion.yml  # prevent infinite triggers
+  workflow_dispatch:
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AUTOPROMOTION_PAT }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "Autopromotion Bot"
+          git config --global user.email "autopromotion-bot@example.com"
+          git config merge.ours.driver true
+
+      # -------- dev → rudev --------
+      - name: Promote dev → rudev
+        run: |
+          git fetch origin
+          if [ $(git rev-list origin/rudev..origin/dev --count) -gt 0 ]; then
+            echo "Promoting dev → rudev..."
+            git checkout rudev
+            git merge origin/dev --no-edit || { echo "Conflict: dev → rudev"; exit 1; }
+            git push origin rudev
+          else
+            echo "No changes to promote from dev → rudev"
+          fi
+
+      # -------- rudev → rutest --------
+      - name: Promote rudev → rutest
+        run: |
+          git fetch origin
+          if [ $(git rev-list origin/rutest..origin/rudev --count) -gt 0 ]; then
+            echo "Promoting rudev → rutest..."
+            git checkout rutest
+            git merge origin/rudev --no-edit || { echo "Conflict: rudev → rutest"; exit 1; }
+            git push origin rutest
+          else
+            echo "No changes to promote from rudev → rutest"
+          fi
+
+     
